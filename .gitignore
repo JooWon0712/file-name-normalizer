@@ -1,0 +1,19 @@
+# Generated executables and build output
+*.exe
+*.dll
+*.pdb
+*.exe~*.TMP
+/bin/
+/obj/
+/.build/
+
+# Test binaries, fixtures, screenshots, and diagnostics
+/tests/
+
+# Rename journals contain private file names and absolute paths
+history/
+rename-*.json
+
+# Temporary files
+*.tmp
+*.writing-*
