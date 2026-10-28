@@ -103,7 +103,7 @@ namespace FileNameNormalizer
     public static class RenameEngine
     {
         private static readonly Regex CodePattern = new Regex(
-            "^(?<prefix>[0-9]*[A-Za-z]+)-(?<number>[0-9]+)(?<suffix>[A-Za-z]*)(?<duplicate> \\([1-9][0-9]*\\))?\\z", RegexOptions.CultureInvariant);
+            "^(?<prefix>[0-9]*[A-Za-z][A-Za-z0-9]*)-(?<number>[0-9]+)(?<suffix>[A-Za-z]*)(?<duplicate> \\([1-9][0-9]*\\))?\\z", RegexOptions.CultureInvariant);
         private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
         private const string JournalPrefix = "rename-";

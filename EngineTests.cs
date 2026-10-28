@@ -28,6 +28,7 @@ namespace FileNameNormalizer.Tests
                 Run("Applying a subset preserves its previewed numbered name", TestSelectedSubset);
                 Run("Late numbered collisions preserve other selected preview names", TestLateNumberedCollision);
                 Run("Numbered names are idempotent with extensions and numeric code prefixes", TestNumberedNames);
+                Run("Mixed letter-number prefixes preserve collision numbering and undo", TestMixedPrefixesWithCollisionsAndUndo);
                 Run("Recursion opt-in and overlapping root de-duplication", TestRecursionAndDeduplication);
                 Run("Unrelated and already-normalized files remain unchanged", TestSkippedAndUnchanged);
                 Run("Target created after preview is preserved and the rename gets a number", TestLateCollision);
@@ -125,12 +126,17 @@ namespace FileNameNormalizer.Tests
                 { "site@000259data-001899cH.MP4", "000259DATA-001899cH.MP4" },
                 { "doc-209 (1)", "DOC-209 (1)" },
                 { "site@259data-1899ch (2).MP4", "259DATA-1899ch (2).MP4" },
-                { "REPORT-001 (12).txt", "REPORT-001 (12).txt" }
+                { "REPORT-001 (12).txt", "REPORT-001 (12).txt" },
+                { "source.example@T38-073", "T38-073" },
+                { "source.example@t38-073.PDF", "T38-073.PDF" },
+                { "2scan3b-0007final.docx", "2SCAN3B-0007final.docx" },
+                { "scan2-004FINAL.TXT", "SCAN2-004FINAL.TXT" },
+                { "source.example@t38-073ch (2).pdf", "T38-073ch (2).pdf" }
             };
             for (int index = 0; index < examples.GetLength(0); index++)
                 Equal(examples[index, 1], RenameEngine.NormalizeName(examples[index, 0]), examples[index, 0]);
 
-            string[] invalid = { "readme.txt", "DOC-208 extra.mp4", "DOC-208 PHOTO-992.mp4", "DOC_208.mp4", "DOC-２０８.mp4", "DOC–208.mp4", "209.mp4", "@.mp4", "", "259-1899.mp4", "PLAN-617 ch.mp4", "PLAN-617ch!.mp4", "PLAN-617-ch.mp4" };
+            string[] invalid = { "readme.txt", "DOC-208 extra.mp4", "DOC-208 PHOTO-992.mp4", "DOC_208.mp4", "DOC-２０８.mp4", "DOC–208.mp4", "209.mp4", "@.mp4", "", "259-1899.mp4", "PLAN-617 ch.mp4", "PLAN-617ch!.mp4", "PLAN-617-ch.mp4", "38-073.pdf", "T_38-073.pdf", "T 38-073.pdf", "T３８-073.pdf" };
             foreach (string name in invalid)
                 Assert(RenameEngine.NormalizeName(name) == null, "Ambiguous or non-matching name must be skipped: " + name);
         }
@@ -298,6 +304,37 @@ namespace FileNameNormalizer.Tests
             Equal(5, after.Entries.Count(e => e.Status == EntryStatus.Unchanged), "Generated and existing numbered names must be recognized as normalized.");
             Equal(0, after.Entries.Count(e => e.Status == EntryStatus.Skipped), "Generated markers must not be treated as unsupported descriptions.");
             Equal(2, RenameEngine.UndoLast(history).Changed, "Extensionless and suffixed numbered changes must undo.");
+        }
+
+        private static void TestMixedPrefixesWithCollisionsAndUndo()
+        {
+            string directory = NewDirectory("mixed-prefix");
+            string history = NewDirectory("mixed-prefix-history");
+            string existing = Write(directory, "T38-073.PDF", "keep existing document");
+            string firstSource = Write(directory, "one@t38-073.PDF", "first document");
+            string secondSource = Write(directory, "two@T38-073.PDF", "second document");
+            ScanResult scan = RenameEngine.Scan(new string[] { directory }, false);
+            RenameEntry first = scan.Entries.Single(e => e.SourcePath == firstSource);
+            RenameEntry second = scan.Entries.Single(e => e.SourcePath == secondSource);
+            Equal("T38-073 (1).PDF", first.NewName, "Mixed prefixes must receive the first free number.");
+            Equal("T38-073 (2).PDF", second.NewName, "Other mixed-prefix files must reserve independent names.");
+
+            BatchResult changed = RenameEngine.Apply(Ready(scan), history);
+            Equal(2, changed.Changed, "Both mixed-prefix files should be normalized. " + Describe(changed));
+            Equal(0, changed.Failed, "Mixed prefixes must pass target and journal validation.");
+            Equal("keep existing document", File.ReadAllText(existing), "The existing document is preserved.");
+            Equal("first document", File.ReadAllText(first.TargetPath), "The first numbered document retains its payload.");
+            Equal("second document", File.ReadAllText(second.TargetPath), "The second numbered document retains its payload.");
+            ScanResult after = RenameEngine.Scan(new string[] { directory }, false);
+            Equal(0, Ready(after).Count, "Mixed-prefix numbered names must be stable when loaded again.");
+            Equal(3, after.Entries.Count(e => e.Status == EntryStatus.Unchanged), "All three mixed-prefix documents are recognized as normalized.");
+
+            BatchResult restored = RenameEngine.UndoLast(history);
+            Equal(2, restored.Changed, "Mixed-prefix journal items must remain undoable. " + Describe(restored));
+            Equal(0, restored.Failed, "Undo accepts the same mixed-prefix rules.");
+            Equal("first document", File.ReadAllText(firstSource), "Undo restores the first original filename.");
+            Equal("second document", File.ReadAllText(secondSource), "Undo restores the second original filename.");
+            Equal("keep existing document", File.ReadAllText(existing), "Undo keeps the preexisting document intact.");
         }
 
         private static void TestRecursionAndDeduplication()
