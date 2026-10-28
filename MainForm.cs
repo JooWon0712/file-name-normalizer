@@ -543,7 +543,7 @@ namespace FileNameNormalizer
                 bool readable = TryReadDropPaths(e.Data, out paths);
                 EndDragFeedback();
                 if (busy || !readable) return;
-                await AddFolders(paths);
+                await LoadDroppedFolders(paths);
             };
             foreach (Control child in target.Controls) EnableFolderDrop(child);
         }
@@ -568,7 +568,7 @@ namespace FileNameNormalizer
                 EndDragFeedback();
                 return;
             }
-            // Adding a folder only imports its path; never report a source-folder move.
+            // Loading a drop only imports its paths; never report a source-folder move.
             e.Effect = (e.AllowedEffect & DragDropEffects.Copy) != 0 ? DragDropEffects.Copy : DragDropEffects.None;
             if (e.Effect == DragDropEffects.None) { EndDragFeedback(); return; }
             dragLeavePending = false;
@@ -605,23 +605,38 @@ namespace FileNameNormalizer
             if (grid != null && !grid.IsDisposed) grid.HideDropFeedback();
         }
 
-        private async Task AddFolders(IEnumerable<string> paths)
+        private async Task LoadDroppedFolders(IEnumerable<string> paths)
         {
             if (busy) return;
+            List<string> droppedRoots = new List<string>();
             int rejected = 0;
-            foreach (string path in paths)
+            foreach (string path in paths ?? Enumerable.Empty<string>())
             {
                 try
                 {
                     string full = Path.GetFullPath(path);
                     if (!Directory.Exists(full)) { rejected++; continue; }
-                    if (!roots.Contains(full, StringComparer.OrdinalIgnoreCase)) roots.Add(full);
+                    if (!droppedRoots.Contains(full, StringComparer.OrdinalIgnoreCase)) droppedRoots.Add(full);
                 }
                 catch { rejected++; }
             }
+            if (droppedRoots.Count == 0)
+            {
+                if (rejected > 0) SetStatus("불러올 폴더가 없습니다. 파일이 들어 있는 폴더를 끌어다 놓으세요.", Theme.Warning);
+                return;
+            }
+            // Each valid drop replaces the preview, including when the new folders
+            // are empty or their scan fails. Never leave old files actionable.
+            roots.Clear();
+            roots.AddRange(droppedRoots);
+            entries.Clear();
+            scanWarnings.Clear();
+            cleanupWarnings.Clear();
+            toolTip.SetToolTip(statusLabel, "");
+            BindRows();
             UpdateFolders();
-            if (roots.Count > 0) await Scan();
-            if (rejected > 0) SetStatus("파일은 직접 추가할 수 없습니다. 파일이 들어 있는 폴더를 추가하세요.", Theme.Warning);
+            await Scan();
+            if (rejected > 0) SetStatus("일부 항목을 제외했습니다. 폴더만 불러올 수 있습니다.", Theme.Warning);
         }
 
         private void UpdateFolders()
