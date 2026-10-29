@@ -2,6 +2,12 @@
 
 폴더를 끌어다 놓아 문서·사진·자료 파일의 이름을 일괄 정리하는 Windows 프로그램입니다. 변경 결과를 미리 보고 선택한 파일만 처리할 수 있습니다.
 
+## 다운로드
+
+[FileNameNormalizer.exe 다운로드](https://github.com/JooWon0712/file-name-normalizer/releases/latest/download/FileNameNormalizer.exe) · [버전별 릴리스](https://github.com/JooWon0712/file-name-normalizer/releases)
+
+설치 프로그램 없이 EXE를 내려받아 실행합니다. 릴리스의 `SHA256SUMS.txt`에서 배포 파일의 SHA-256 해시를 확인할 수 있습니다.
+
 ## 주요 기능
 
 - 여러 폴더와 모든 하위 폴더의 파일을 한 목록에서 확인
@@ -14,7 +20,7 @@
 
 Windows 10/11과 .NET Framework 4.8 환경에서 사용합니다.
 
-1. PowerShell에서 `./build.ps1`로 빌드한 뒤 `FileNameNormalizer.exe`를 실행합니다.
+1. 위 다운로드 링크에서 받은 `FileNameNormalizer.exe`를 실행합니다.
 2. 폴더를 창에 끌어다 놓고 변경할 이름과 경로를 확인합니다. 새로 드래그하면 이번에 놓은 폴더 기준으로 목록을 새로 불러옵니다. 여러 폴더는 한 번에 함께 드래그하세요.
 3. 파일을 선택한 뒤 변경 버튼을 누릅니다.
 
@@ -31,6 +37,8 @@ Windows 10/11과 .NET Framework 4.8 환경에서 사용합니다.
 ## 개발과 기록
 
 C# 5 · WinForms · .NET Framework 4.8 · PowerShell 빌드
+
+소스에서 직접 빌드하려면 PowerShell에서 `./build.ps1`을 실행합니다.
 
 사용자별 되돌리기 기록은 `%LOCALAPPDATA%\FileNameNormalizer\history`에 저장합니다. `history/`와 변경 기록 JSON, 실행 파일·빌드 산출물은 Git에서 제외합니다.
 
