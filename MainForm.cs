@@ -206,9 +206,22 @@ namespace FileNameNormalizer
         private int dragFolderCount;
         private bool dragLeavePending, dragUsesMouseButtons;
         private long dragLeaveAt;
+        private bool frameActive;
+
+        private const int WmSettingChange = 0x001A;
+        private const int WmThemeChanged = 0x031A;
+        private const int WmDwmCompositionChanged = 0x031E;
+        private const int DwmUseImmersiveDarkMode = 20;
+        private const int DwmBorderColor = 34;
+        private const int DwmCaptionColor = 35;
+        private const int DwmTextColor = 36;
+        private const int DwmColorDefault = -1;
 
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int key);
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
         public MainForm()
         {
@@ -258,6 +271,59 @@ namespace FileNameNormalizer
             ResumeLayout(false);
             PerformAutoScale();
             PerformLayout();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyWindowFrameTheme();
+        }
+
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            frameActive = true;
+            ApplyWindowFrameTheme();
+        }
+
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            frameActive = false;
+            ApplyWindowFrameTheme();
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            base.WndProc(ref message);
+            if (message.Msg == WmSettingChange || message.Msg == WmThemeChanged ||
+                message.Msg == WmDwmCompositionChanged)
+                ApplyWindowFrameTheme();
+        }
+
+        private void ApplyWindowFrameTheme()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            try
+            {
+                bool highContrast = SystemInformation.HighContrast;
+                SetWindowFrameAttribute(DwmUseImmersiveDarkMode, highContrast ? 0 : 1);
+                SetWindowFrameAttribute(DwmCaptionColor, highContrast ? DwmColorDefault :
+                    ColorTranslator.ToWin32(frameActive ? Theme.Surface : Theme.Background));
+                SetWindowFrameAttribute(DwmTextColor, highContrast ? DwmColorDefault :
+                    ColorTranslator.ToWin32(frameActive ? Theme.Text : Theme.Muted));
+                SetWindowFrameAttribute(DwmBorderColor, highContrast ? DwmColorDefault :
+                    ColorTranslator.ToWin32(frameActive ? Theme.ButtonBorder : Theme.Border));
+            }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+        }
+
+        private void SetWindowFrameAttribute(int attribute, int value)
+        {
+            // DWM returns a failure HRESULT for attributes unavailable on older Windows.
+            // Keep the native frame and any supported styling in that case.
+            DwmSetWindowAttribute(Handle, attribute, ref value, sizeof(int));
         }
 
         protected override void Dispose(bool disposing)
